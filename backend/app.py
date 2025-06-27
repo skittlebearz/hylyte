@@ -181,8 +181,8 @@ def highlight_video():
         if not data:
             return jsonify({'error': 'No JSON data provided'}), 400
         
-        youtube_url = data.get('youtube_url')
-        user_prompt = data.get('user_prompt')
+        youtube_url = data.get('url')
+        user_prompt = data.get('prompt')
         
         if not youtube_url:
             return jsonify({'error': 'youtube_url is required'}), 400
