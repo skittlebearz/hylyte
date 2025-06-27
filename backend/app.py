@@ -6,11 +6,12 @@ import uuid
 from datetime import datetime
 from dotenv import load_dotenv
 import openai
-from pytube import YouTube
+import yt_dlp
 from youtube_transcript_api import YouTubeTranscriptApi
 import ffmpeg
 import tempfile
 import shutil
+import re
 
 # Load environment variables
 load_dotenv()
@@ -32,27 +33,57 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 def get_video_id(url):
     """Extract video ID from YouTube URL"""
     try:
-        yt = YouTube(url)
-        return yt.video_id
+        # Use regex to extract video ID from various YouTube URL formats
+        patterns = [
+            r'(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)',
+            r'youtube\.com\/watch\?.*v=([^&\n?#]+)'
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, url)
+            if match:
+                return match.group(1)
+        
+        return None
     except Exception as e:
         print(f"Error extracting video ID: {e}")
         return None
 
 
 def download_youtube_video(url, output_path):
-    """Download YouTube video to local file"""
+    """Download YouTube video to local file using yt-dlp"""
     try:
-        yt = YouTube(url)
-        stream = yt.streams.filter(progressive=True, file_extension='mp4').order_by('resolution').desc().first()
+        # Configure yt-dlp options
+        ydl_opts = {
+            'outtmpl': os.path.join(output_path, '%(id)s.%(ext)s'),
+            'format': 'best[ext=mp4]/best[ext=webm]/best',
+            'quiet': True,
+            'no_warnings': True,
+        }
         
-        if not stream:
-            raise Exception("No suitable video stream found")
-        
-        # Download to the specified path
-        stream.download(output_path=output_path, filename=f"{yt.video_id}.mp4")
-        
-        video_path = os.path.join(output_path, f"{yt.video_id}.mp4")
-        return video_path, yt.title
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            # Get video info first
+            info = ydl.extract_info(url, download=False)
+            video_id = info['id']
+            video_title = info['title']
+            
+            # Download the video
+            ydl.download([url])
+            
+            # Find the downloaded file
+            video_path = os.path.join(output_path, f"{video_id}.mp4")
+            if not os.path.exists(video_path):
+                # Try other extensions
+                for ext in ['webm', 'mkv', 'avi']:
+                    alt_path = os.path.join(output_path, f"{video_id}.{ext}")
+                    if os.path.exists(alt_path):
+                        video_path = alt_path
+                        break
+            
+            if os.path.exists(video_path):
+                return video_path, video_title
+            else:
+                raise Exception("Downloaded file not found")
         
     except Exception as e:
         print(f"Error downloading video: {e}")
