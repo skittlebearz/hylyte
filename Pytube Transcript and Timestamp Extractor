@@ -1,0 +1,32 @@
+pip install pytube youtube-transcript-api #critical for this to work
+
+from pytube import YouTube
+from youtube_transcript_api import YouTubeTranscriptApi
+
+def get_video_id(url):
+    # Extracts the video ID from a YouTube URL
+    return YouTube(url).video_id
+
+def fetch_transcript(video_id, language='en'):
+    # Fetches the transcript for the given video ID
+    try:
+        transcript = YouTubeTranscriptApi.get_transcript(video_id, languages=[language])
+        return transcript
+    except Exception as e:
+        print(f"Error fetching transcript: {e}")
+        return None
+
+def print_transcript_with_timestamps(transcript):
+    for entry in transcript:
+        start = entry['start']
+        text = entry['text']
+        print(f"[{start:.2f}s] {text}")
+
+if __name__ == "__main__":
+    url = input("Enter YouTube video URL: ")
+    video_id = get_video_id(url)
+    transcript = fetch_transcript(video_id)
+    if transcript:
+        print_transcript_with_timestamps(transcript)
+    else:
+        print("Transcript not available for this video.")
